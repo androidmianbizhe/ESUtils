@@ -45,17 +45,34 @@ public class ESAPi {
     TransportClient client;
 
     // 创建文档
-    public boolean createIndexAndMapping(String indexName, ESIndexSettingAndMapping mapping) {
+    public boolean createIndexAndMapping(String indexName, ESIndexSettingAndMapping mapping) throws ExecutionException, InterruptedException, IOException {
         if (!indexExists(indexName)) {
             CreateIndexRequest request = new CreateIndexRequest(indexName);
-            ActionFuture<CreateIndexResponse> res = client.admin().indices().create(request);
-            try {
-                return res.get().isAcknowledged();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            }
+            CreateIndexResponse createIndexResponse = client.admin().indices().create(request).actionGet();
+
+            //创建mapping约束字段
+            XContentBuilder xContentMapping = XContentFactory.jsonBuilder().startObject()
+                    .startObject("properties")
+                    .startObject("title")
+                    .field("type","text")
+                    .endObject()
+                    .startObject("publishDate")
+                    .field("type", "date")
+                    .endObject()
+                    .startObject("content")
+                    .field("type","text")
+                    .endObject()
+                    .startObject("director")
+                    .field("type", "keyword")
+                    .endObject()
+                    .startObject("price")
+                    .field("type", "float")
+                    .endObject()
+                    .endObject()
+                    .endObject();
+            //添加mapping 绑定到 index
+            PutMappingRequest putMappingRequest = Requests.putMappingRequest("film").type("dongzuo").source(mapping);
+            client.admin().indices().putMapping(putMappingRequest).actionGet();
         }
         return false;
     }
@@ -66,23 +83,13 @@ public class ESAPi {
 
         IndicesExistsRequest request = new IndicesExistsRequest(indexName);
         IndicesExistsResponse response = adminClient.exists(request).actionGet();
-        if (response.isExists()) {
-            return true;
-        }
-        return false;
+        return response.isExists();
     }
 
     // 删除索引
     public boolean deleteIndex(String indexName) {
         DeleteIndexRequest request = new DeleteIndexRequest(indexName);
         ActionFuture<DeleteIndexResponse> delete = client.admin().indices().delete(request);
-        try {
-            return delete.get().isAcknowledged();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (ExecutionException e) {
-            e.printStackTrace();
-        }
-        return false;
+        return delete.actionGet().isAcknowledged();
     }
 }
